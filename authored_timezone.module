@@ -46,6 +46,12 @@ function authored_timezone_form_node_type_form_alter(&$form, &$form_state, $form
       ),
     ),
   );
+
+  // Disable Country option if Submitted By module enabled.
+  if (module_exists('submitted_by')) {
+    $form['display']['authored_timezone_country']['#disabled'] = TRUE;
+    $form['display']['authored_timezone_country']['#description'] = t("This option doesn't work automatically when the 'Submitted By' module in enabled. Instead, simply add the `[node:authored-timezone-country]` token to the byline text fields yourself.");
+  }
 }
 
 /**
