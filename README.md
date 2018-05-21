@@ -7,6 +7,23 @@ of content can display its authored/submitted/created date in the timezone from
 which it was written. You can also, optionally, display the author's country in
 the 'Submitted' information.
 
+Notes
+-----
+
+This module implements `hook_preprocess_node()` to display the 'created' date in
+the selected timezone. As such, it can be easily overwritten by other
+modules/themes that also implement `hook_preprocess_node()`. If your dates
+aren't being displayed in the correct timezone, make sure other modules/themes
+on your site aren't overwriting this.
+
+When the 'Submitted By' module is enabled, it takes over control of the display
+of the created date, author, etc. Therefore, you'll need to manually swap any
+instances of `[node:created]` with `[node:authored-timezone-date]` to see your
+dates displayed in the correct timezone.  
+Additionally, the 'Display author country' option will be disabled, and you'll
+need to manually add the `[node:authored-timezone-country]` token to your byline
+fields instead.
+
 Installation
 ------------
 
