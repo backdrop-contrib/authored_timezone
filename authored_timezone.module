@@ -148,3 +148,78 @@ function authored_timezone_preprocess_node(&$variables) {
   }
 }
 
+/**
+ * Implements hook_token_info_alter().
+ */
+function authored_timezone_token_info_alter(&$data) {
+  // Add extra node tokens.
+  $data['tokens']['node']['authored-timezone-date'] = array(
+    'name' => t('Date created (authored timezone)'),
+    'description' => t('The date the node was posted (in the authored timezone).'),
+    'type' => 'date',
+  );
+  $data['tokens']['node']['authored-timezone'] = array(
+    'name' => t('Authored timezone'),
+    'description' => t('The timezone where the node was authored.'),
+  );
+  $data['tokens']['node']['authored-timezone-country'] = array(
+    'name' => t('Authored country'),
+    'description' => t('The country where the node was authored.'),
+  );
+}
+
+/**
+ * Implements hook_tokens_alter().
+ */
+function authored_timezone_tokens_alter(array &$replacements, array $context) {
+  $language_code = isset($context['options']['language']) ? $options['language']->langcode : NULL;
+
+  // Add extra node tokens.
+  if ($context['type'] == 'node' && !empty($context['data']['node'])) {
+    $node = $context['data']['node'];
+    $node_type = node_type_get_type($node->type);
+
+    if ($node_type->settings['authored_timezone_enabled'] && !empty($node->authored_timezone)) {
+      // Add 'authored-timezone-date' token.
+      if (isset($context['tokens']['authored-timezone-date'])) {
+        $replacements[$context['tokens']['authored-timezone-date']] = format_date($node->created, 'medium', '', $node->authored_timezone, $language_code);
+      }
+      if ($authored_timezone_date_tokens = token_find_with_prefix($context['tokens'], 'authored-timezone-date')) {
+        $replacements += token_generate('date', $authored_timezone_date_tokens, array('date' => $node->created, 'timezone' => $node->authored_timezone), $context['options']);
+      }
+
+      // Add 'authored-timezone' token.
+      if (isset($context['tokens']['authored-timezone'])) {
+        $replacements[$context['tokens']['authored-timezone']] = $node->authored_timezone;
+      }
+
+      // Add 'authored-timezone-country' token.
+      if (isset($context['tokens']['authored-timezone-country']) && $node_type->settings['authored_timezone_country']) {
+        include_once BACKDROP_ROOT . '/core/includes/locale.inc';
+        $timezone_countries = timezone_country_get_list();
+        $countries = country_get_list();
+        $country = $timezone_countries[$node->authored_timezone];
+        $country_name = $countries[$country];
+        $replacements[$context['tokens']['authored-timezone-country']] = $country_name;
+      }
+    }
+  }
+
+  // Add date variants for extra node tokens.
+  if ($context['type'] == 'date' && !empty($context['data']['date']) && !empty($context['data']['timezone'])) {
+    $date_format_types = system_get_date_formats();
+
+    foreach ($context['tokens'] as $name => $original) {
+      if (isset($date_format_types[$name])) {
+        $replacements[$original] = format_date($context['data']['date'], $name, '', $context['data']['timezone'], $language_code);
+      }
+    }
+
+    if ($created_tokens = token_find_with_prefix($context['tokens'], 'custom')) {
+      foreach ($created_tokens as $name => $original) {
+        $replacements[$original] = format_date($context['data']['date'], 'custom', $name, $context['data']['timezone'], $language_code);
+      }
+    }
+  }
+}
+
