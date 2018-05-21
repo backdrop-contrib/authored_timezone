@@ -1,0 +1,150 @@
+<?php
+/**
+ * @file
+ * Specify a custom timezone for the 'Authored on' field.
+ */
+
+/**
+ * Implements hook_node_type_load().
+ */
+function authored_timezone_node_type_load(&$types) {
+  // Set defaults for authored timezone settings.
+  // This also allows these settings to be automatically saved to the node type
+  // configuration.
+  foreach ($types as $type_name => $type) {
+    $types[$type_name]->settings += array(
+      'authored_timezone_enabled' => FALSE,
+      'authored_timezone_country' => FALSE,
+    );
+  }
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter() for node_type_form.
+ */
+function authored_timezone_form_node_type_form_alter(&$form, &$form_state, $form_id) {
+  $type = $form['#node_type'];
+
+  // Add authored timezone settings to node types.
+  $form['display']['authored_timezone_enabled'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Show option to set timezone'),
+    '#description' => t("Specify a custom timezone for the 'Authored on' field."),
+    '#default_value' => $type->settings['authored_timezone_enabled'],
+    '#weight' => -1,
+  );
+  $form['display']['authored_timezone_country'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Display author country'),
+    '#description' => t("The author's country (taken from the timezone) will be displayed along with the author and date information."),
+    '#default_value' => $type->settings['authored_timezone_country'],
+    '#weight' => 1,
+    '#states' => array(
+      'visible' => array(
+        'input[name="authored_timezone_enabled"]' => array('checked' => TRUE),
+        'input[name="node_submitted"]' => array('checked' => TRUE),
+      ),
+    ),
+  );
+}
+
+/**
+ * Implements hook_node_prepare().
+ */
+function authored_timezone_node_prepare(Node $node) {
+  $node_type = node_type_get_type($node->type);
+
+  // Display the 'Authored on' date textfield in the selected timezone.
+  if ($node_type->settings['authored_timezone_enabled'] && !empty($node->authored_timezone)) {
+    if (isset($node->nid) && !isset($node->is_new)) {
+      $node->date = format_date($node->created, 'custom', 'Y-m-d H:i:s O', $node->authored_timezone);
+    }
+  }
+}
+
+/**
+ * Implements hook_date_popup_process_alter().
+ */
+function authored_timezone_date_popup_process_alter(&$element, &$form_state, $context) {
+  $node_type = node_type_get_type($context['form']['#node']->type);
+
+  // Display the 'Authored on' date_popup field in the selected timezone.
+  if ($node_type->settings['authored_timezone_enabled'] && !empty($context['form']['#node']->authored_timezone)) {
+    // Use the correct timezone.
+    $element['#date_timezone'] = $context['form']['#node']->authored_timezone;
+
+    // Reset the date & time.
+    unset($element['#value']['date'], $element['#value']['time']);
+    $element['date'] = _date_popup_process_date_part($element);
+    $element['time'] = _date_popup_process_time_part($element);
+  }
+}
+
+/**
+ * Implements hook_form_BASE_FORM_ID_alter() for node_form.
+ */
+function authored_timezone_form_node_form_alter(&$form, &$form_state, $form_id) {
+  $node_type = node_type_get_type($form['#node']->type);
+
+  if ($node_type->settings['authored_timezone_enabled']) {
+    // Add authored timezone field to nodes.
+    $form['author']['authored_timezone'] = array(
+      '#type' => 'select',
+      '#title' => t('Authored timezone'),
+      '#description' => t('Select the timezone where this content was authored.'),
+      '#default_value' => !empty($node->authored_timezone) ? $node->authored_timezone : date_default_timezone_get(),
+      '#options' => system_time_zones(),
+      '#weight' => 1,
+    );
+
+    // If the timezone hasn't been set, set it to the author's location.
+    if (empty($node->authored_timezone)) {
+      backdrop_add_js('core/misc/timezone.js');
+      $form['author']['authored_timezone']['#attributes'] = array('class' => array('timezone-detect'));
+    }
+  }
+}
+
+/**
+ * Implements hook_node_submit().
+ */
+function authored_timezone_node_submit(Node $node, $form, &$form_state) {
+  $node_type = node_type_get_type($node->type);
+
+  if ($node_type->settings['authored_timezone_enabled']) {
+    // Set the node created date using the selected timezone.
+    // @see node_submit()
+    $time = !empty($node->date) && is_string($node->date) ? $node->date : 'now';
+    $tz = !empty($node->authored_timezone) ? $node->authored_timezone : NULL;
+    $date = new BackdropDateTime($time, $tz);
+    $node->created = $date->format('U');
+  }
+}
+
+/**
+ * Implements hook_preprocess_HOOK() for theme_node.
+ */
+function authored_timezone_preprocess_node(&$variables) {
+  $node_type = node_type_get_type($variables['node']->type);
+
+  if ($node_type->settings['authored_timezone_enabled'] && !empty($variables['authored_timezone'])) {
+    // Set the submitted date using the selected timezone.
+    $variables['date'] = format_date($variables['node']->created, 'medium', '', $variables['authored_timezone']);
+
+    // Update the submitted information with the timezone-enabled date and
+    // country, if applicable.
+    if ($variables['display_submitted'] == TRUE) {
+      $variables['submitted'] = t('Submitted by !username on !datetime', array('!username' => $variables['name'], '!datetime' => $variables['date']));
+
+      if ($node_type->settings['authored_timezone_country']) {
+        include_once BACKDROP_ROOT . '/core/includes/locale.inc';
+        $timezone_countries = timezone_country_get_list();
+        $countries = country_get_list();
+        $country = $timezone_countries[$variables['authored_timezone']];
+        $country_name = $countries[$country];
+        $variables['submitted'] .= t(' from !country', array('!country' => $country_name));
+      }
+    }
+  }
+}
+

@@ -1,0 +1,5 @@
+name = Authored Timezone
+description = Specify a custom timezone for the 'Authored on' field.
+backdrop = 1.x
+type = module
+

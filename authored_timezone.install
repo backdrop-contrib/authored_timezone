@@ -1,0 +1,50 @@
+<?php
+/**
+ * @file
+ * Install, update, and uninstall functions for the Authored Timezone module.
+ */
+
+/**
+ * Implements hook_schema_alter().
+ */
+function authored_timezone_schema_alter(&$schema) {
+  // Add authored timezone field to node schema.
+  $schema['node']['fields']['authored_timezone'] = array(
+    'description' => 'The timezone of the created date/time.',
+    'type' => 'varchar',
+    'length' => 32,
+    'default' => '',
+  );
+}
+
+/**
+ * Implements hook_install().
+ */
+function authored_timezone_install() {
+  // Create authored timezone field.
+  if (!db_field_exists('node', 'authored_timezone')) {
+    $schema = array();
+    authored_timezone_schema_alter($schema);
+    db_add_field('node', 'authored_timezone', $schema['node']['fields']['authored_timezone']);
+  }
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function authored_timezone_uninstall() {
+  // Remove authored timezone field.
+  if (db_field_exists('node', 'authored_timezone')) {
+    db_drop_field('node', 'authored_timezone');
+  }
+
+  // Remove node type settings.
+  $node_types = array_keys(node_type_get_names());
+  foreach ($node_types as $node_type) {
+    $config = config('node.type.' . $node_type);
+    $config->clear('settings.authored_timezone_enabled');
+    $config->clear('settings.authored_timezone_country');
+    $config->save();
+  }
+}
+
