@@ -90,7 +90,8 @@ function authored_timezone_date_popup_process_alter(&$element, &$form_state, $co
  * Implements hook_form_BASE_FORM_ID_alter() for node_form.
  */
 function authored_timezone_form_node_form_alter(&$form, &$form_state, $form_id) {
-  $node_type = node_type_get_type($form['#node']->type);
+  $node = $form_state['node'];
+  $node_type = node_type_get_type($node->type);
 
   if ($node_type->settings['authored_timezone_enabled']) {
     // Add authored timezone field to nodes.
