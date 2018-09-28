@@ -179,7 +179,7 @@ function authored_timezone_token_info_alter(&$data) {
  * Implements hook_tokens_alter().
  */
 function authored_timezone_tokens_alter(array &$replacements, array $context) {
-  $language_code = isset($context['options']['language']) ? $options['language']->langcode : NULL;
+  $language_code = isset($context['options']['language']) ? $context['options']['language']->langcode : NULL;
 
   // Add extra node tokens.
   if ($context['type'] == 'node' && !empty($context['data']['node'])) {
